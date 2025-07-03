@@ -1,4 +1,4 @@
-# Bỏ qua toàn bộ trừ thư mục build/web
 *
 !build/
 !build/web/
+!build/web/index.html
