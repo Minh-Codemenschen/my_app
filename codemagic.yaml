@@ -1,31 +1,27 @@
 workflows:
   flutter-app-build:
-    name: Build Flutter App (Android & iOS)
+    name: Build Flutter App (Android, iOS & Web)
     max_build_duration: 60
     environment:
       flutter: stable
       xcode: latest
-      android_signing:
-        - my_keystore
-      ios_signing:
-        provisioning_profiles:
-          - ios_profile
-        certificates:
-          - ios_certificate
     scripts:
       - name: Get Flutter packages
         script: flutter pub get
 
-      - name: Build APK
+      - name: Build Android APK
         script: flutter build apk --release
 
-      - name: Build iOS
-        script: |
-          flutter build ios --release --no-codesign
+      - name: Build iOS (no code sign)
+        script: flutter build ios --release --no-codesign
+
+      - name: Build Web
+        script: flutter build web --release
 
     artifacts:
       - build/app/outputs/flutter-apk/app-release.apk
       - build/ios/ipa/*.ipa
+      - build/web/**
 
     publishing:
       email:
