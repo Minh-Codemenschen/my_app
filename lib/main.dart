@@ -14,7 +14,6 @@ void main() async {
 
 class MyApp extends StatefulWidget {
   const MyApp({super.key});
-
   @override
   State<MyApp> createState() => _MyAppState();
 }
@@ -36,7 +35,7 @@ class _MyAppState extends State<MyApp> {
         email: emailController.text.trim(),
         password: passwordController.text,
       );
-      setState(() {});
+      setState(() {}); // trigger rebuild
     } on AuthException catch (error) {
       setState(() => errorMessage = error.message);
     } catch (_) {
@@ -59,15 +58,12 @@ class _MyAppState extends State<MyApp> {
       debugShowCheckedModeBanner: false,
       title: 'Supabase App',
       theme: ThemeData(primarySwatch: Colors.teal),
-      home: Scaffold(
-        appBar: AppBar(
-          title: Text(user == null ? 'Login' : 'Home'),
-          actions: user != null
-              ? [IconButton(icon: const Icon(Icons.logout), onPressed: _logout)]
-              : null,
-        ),
-        body: user == null ? _buildLoginForm() : _buildHome(user.email),
-      ),
+      home: user == null
+          ? Scaffold(
+              appBar: AppBar(title: const Text('Login')),
+              body: _buildLoginForm(),
+            )
+          : _buildHome(user.email),
     );
   }
 
@@ -76,88 +72,37 @@ class _MyAppState extends State<MyApp> {
       child: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 32),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             const Text(
               'Login',
-              style: TextStyle(
-                fontSize: 36,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 1,
-              ),
+              style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
             ),
-            const SizedBox(height: 40),
-
-            // Username field
+            const SizedBox(height: 30),
             TextField(
               controller: emailController,
-              decoration: InputDecoration(
-                labelText: 'Username',
-                hintText: 'Type your username',
-                prefixIcon: const Icon(Icons.person_outline),
-                border: const OutlineInputBorder(
-                  borderSide: BorderSide.none,
-                  borderRadius: BorderRadius.all(Radius.circular(12)),
-                ),
-                filled: true,
-                fillColor: Colors.grey.shade100,
+              decoration: const InputDecoration(
+                labelText: 'Email',
+                prefixIcon: Icon(Icons.person),
+                border: OutlineInputBorder(),
               ),
             ),
             const SizedBox(height: 20),
-
-            // Password field
             TextField(
               controller: passwordController,
               obscureText: true,
-              decoration: InputDecoration(
+              decoration: const InputDecoration(
                 labelText: 'Password',
-                hintText: 'Type your password',
-                prefixIcon: const Icon(Icons.lock_outline),
-                border: const OutlineInputBorder(
-                  borderSide: BorderSide.none,
-                  borderRadius: BorderRadius.all(Radius.circular(12)),
-                ),
-                filled: true,
-                fillColor: Colors.grey.shade100,
+                prefixIcon: Icon(Icons.lock),
+                border: OutlineInputBorder(),
               ),
             ),
-            const SizedBox(height: 40),
-
-            // Gradient login button
+            const SizedBox(height: 20),
             loading
                 ? const CircularProgressIndicator()
-                : Container(
-                    width: double.infinity,
-                    height: 50,
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFF00E5FF), Color(0xFFDA00FF)],
-                      ),
-                      borderRadius: BorderRadius.circular(30),
-                    ),
-                    child: Material(
-                      color: Colors.transparent,
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(30),
-                        onTap: _login,
-                        child: const Center(
-                          child: Text(
-                            'LOGIN',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 1,
-                              fontSize: 16,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-
+                : ElevatedButton(onPressed: _login, child: const Text('LOGIN')),
             if (errorMessage != null)
               Padding(
-                padding: const EdgeInsets.only(top: 20),
+                padding: const EdgeInsets.only(top: 10),
                 child: Text(
                   errorMessage!,
                   style: const TextStyle(color: Colors.red),
@@ -170,6 +115,155 @@ class _MyAppState extends State<MyApp> {
   }
 
   Widget _buildHome(String? email) {
-    return Center(child: Text('Hello, ${email ?? 'user'}!'));
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: Supabase.instance.client
+          .from('courses')
+          .select()
+          .order('created_at', ascending: false),
+      builder: (context, snapshot) {
+        final user = Supabase.instance.client.auth.currentUser;
+
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        final courses = snapshot.data ?? [];
+
+        return Scaffold(
+          appBar: AppBar(
+            title: Text('Welcome, ${email ?? 'User'}'),
+            actions: [
+              IconButton(icon: const Icon(Icons.logout), onPressed: _logout),
+            ],
+          ),
+          body: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text(
+                  'Course List',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 16),
+                Expanded(
+                  child: DataTable(
+                    columnSpacing: 12,
+                    columns: const [
+                      DataColumn(label: Expanded(child: Text('STT'))),
+                      DataColumn(label: Expanded(child: Text('Name'))),
+                      DataColumn(label: Expanded(child: Text('Describe'))),
+                      DataColumn(label: Expanded(child: Text('Creator'))),
+                      DataColumn(label: Expanded(child: Text('Date created'))),
+                    ],
+                    rows: List.generate(courses.length, (index) {
+                      final course = courses[index];
+                      final createdAt = DateTime.tryParse(
+                        course['created_at'] ?? '',
+                      );
+                      final formattedDate = createdAt != null
+                          ? '${createdAt.day}/${createdAt.month}/${createdAt.year}'
+                          : '';
+
+                      return DataRow(
+                        cells: [
+                          DataCell(Text('${index + 1}')),
+                          DataCell(Text(course['title'] ?? '', softWrap: true)),
+                          DataCell(
+                            Text(course['description'] ?? '', softWrap: true),
+                          ),
+                          DataCell(
+                            Text(course['user_email'] ?? '', softWrap: true),
+                          ),
+                          DataCell(Text(formattedDate)),
+                        ],
+                      );
+                    }),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          floatingActionButton: FloatingActionButton(
+            onPressed: () async {
+              final result = await Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const AddCoursePage()),
+              );
+              if (result == true) setState(() {});
+            },
+            child: const Icon(Icons.add),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class AddCoursePage extends StatefulWidget {
+  const AddCoursePage({super.key});
+
+  @override
+  State<AddCoursePage> createState() => _AddCoursePageState();
+}
+
+class _AddCoursePageState extends State<AddCoursePage> {
+  final titleController = TextEditingController();
+  final descriptionController = TextEditingController();
+  bool loading = false;
+
+  Future<void> _submit() async {
+    setState(() => loading = true);
+    final userId = Supabase.instance.client.auth.currentUser?.id;
+
+    try {
+      final response = await Supabase.instance.client.from('courses').insert({
+        'title': titleController.text.trim(),
+        'description': descriptionController.text.trim(),
+        'user_id': userId,
+        'user_email': Supabase.instance.client.auth.currentUser?.email,
+      }).select();
+
+      Navigator.pop(context, true); // reload home
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error: $e')));
+    } finally {
+      setState(() => loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Add course')),
+      body: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          children: [
+            TextField(
+              controller: titleController,
+              decoration: const InputDecoration(labelText: 'Name'),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: descriptionController,
+              decoration: const InputDecoration(labelText: 'Describe'),
+            ),
+            const SizedBox(height: 20),
+            loading
+                ? const CircularProgressIndicator()
+                : ElevatedButton(
+                    onPressed: _submit,
+                    child: const Text('Create a course'),
+                  ),
+          ],
+        ),
+      ),
+    );
   }
 }
