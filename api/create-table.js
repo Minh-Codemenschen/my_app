@@ -1,10 +1,10 @@
-const axios = require('axios');
-
 const SUPABASE_URL = 'https://vzusoizwmnarilhtmzuc.supabase.co';
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-module.exports = async (req, res) => {
-    if (req.method !== 'POST') return res.status(405).send('Method not allowed');
+export default async function handler(req, res) {
+    if (req.method !== 'POST') {
+        return res.status(405).json({ error: 'Method not allowed' });
+    }
 
     const sql = `
     create table if not exists courses (
@@ -15,16 +15,27 @@ module.exports = async (req, res) => {
   `;
 
     try {
-        await axios.post(`${SUPABASE_URL}/rest/v1/rpc/execute_sql`, { sql }, {
+        const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/execute_sql`, {
+            method: 'POST',
             headers: {
                 apikey: SERVICE_ROLE_KEY,
                 Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
                 'Content-Type': 'application/json',
             },
+            body: JSON.stringify({ sql }),
         });
 
-        res.status(200).json({ message: '✅ Table created!' });
+        const result = await response.json();
+
+        if (!response.ok) {
+            return res.status(500).json({
+                error: '❌ Failed to create table',
+                detail: result,
+            });
+        }
+
+        return res.status(200).json({ message: '✅ Table created!' });
     } catch (err) {
-        res.status(500).json({ error: '❌ Failed to create table' });
+        return res.status(500).json({ error: '❌ Unexpected server error' });
     }
-};
+}
