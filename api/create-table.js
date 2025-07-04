@@ -2,18 +2,25 @@ const SUPABASE_URL = 'https://vzusoizwmnarilhtmzuc.supabase.co';
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 export default async function handler(req, res) {
-    let sql = '';
+    const { method, query } = req;
 
-    if (req.method === 'GET') {
-        sql = req.query.sql;
-    } else if (req.method === 'POST') {
-        sql = req.body.sql;
+    // Lấy SQL từ body (POST) hoặc query (GET)
+    let sql = '';
+    if (method === 'POST') {
+        try {
+            const body = await req.json?.(); // nếu Vercel hỗ trợ
+            sql = body?.sql || '';
+        } catch (e) {
+            return res.status(400).json({ error: 'Invalid JSON body' });
+        }
+    } else if (method === 'GET') {
+        sql = query.sql;
     } else {
-        return res.status(405).json({ error: 'Method not allowed. Use GET or POST' });
+        return res.status(405).json({ error: 'Method not allowed' });
     }
 
     if (!sql) {
-        return res.status(400).json({ error: 'Missing SQL query. Provide it via query param (?sql=...) or JSON body { sql: "..." }' });
+        return res.status(400).json({ error: 'Missing SQL query' });
     }
 
     try {
@@ -27,7 +34,8 @@ export default async function handler(req, res) {
             body: JSON.stringify({ sql }),
         });
 
-        const result = await response.json();
+        const resultText = await response.text(); // tránh lỗi parse JSON
+        const result = resultText ? JSON.parse(resultText) : {};
 
         if (!response.ok) {
             return res.status(500).json({
